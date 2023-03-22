@@ -19,6 +19,7 @@ class SensorModel:
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
         self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
+        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale")
 
         ####################################
         # TODO
@@ -53,6 +54,9 @@ class SensorModel:
                 OccupancyGrid,
                 self.map_callback,
                 queue_size=1)
+
+        # set the map resolution
+        self.map_resolution = self.map.resolution
 
     def p_hit(self, z, d):
         return 1/np.sqrt(2.*np.pi*self.sigma_hit**2.) * np.exp(-((z-d)**2.) / (2.*self.sigma_hit**2.))
@@ -132,6 +136,39 @@ class SensorModel:
         # This produces a matrix of size N x num_beams_per_particle 
 
         scans = self.scan_sim.scan(particles)
+
+        # scale meters to pixels
+        scans = np.divide(scans, self.lidar_scale_to_map_scale * self.map_resolution)
+        observation = np.divide(observation, self.lidar_scale_to_map_scale * self.map_resolution)
+
+        # clip values outside [0, self.table_width-1]
+        scans = np.clip(scans, 0, self.table_width-1)
+        observation = np.clip(observation, 0, self.table_width-1)
+
+	# this is the list of probabilities that we are returning
+        probabilities = []
+
+        # iterate over the number of particles
+        for i in range(len(scan)):
+
+            # this is the cumulative product over the scans
+            cumulative_probability = 1
+
+            # iterate over the number of beams
+            for j in range(len(scan[i])):
+
+                current_d = scan[i][j]
+                current_beam = observation[j]
+
+                # does this convert to valid table indices?
+                current_d = int(current_d)
+                current_beam = int(current_beam)
+
+                cumulative_probability *= self.sensor_model_table[current_d][current_beam]
+
+            probabilities.append(cumulative_probability)
+
+        return probabilities
 
         ####################################
 
