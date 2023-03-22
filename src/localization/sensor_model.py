@@ -8,6 +8,8 @@ import tf
 from nav_msgs.msg import OccupancyGrid
 from tf.transformations import quaternion_from_euler
 
+import math
+
 class SensorModel:
 
 
@@ -21,11 +23,11 @@ class SensorModel:
         ####################################
         # TODO
         # Adjust these parameters
-        self.alpha_hit = 0
-        self.alpha_short = 0
-        self.alpha_max = 0
-        self.alpha_rand = 0
-        self.sigma_hit = 0
+        self.alpha_hit = 0.74
+        self.alpha_short = 0.07
+        self.alpha_max = 0.07
+        self.alpha_rand = 0.12
+        self.sigma_hit = 8.0
 
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
@@ -52,6 +54,23 @@ class SensorModel:
                 self.map_callback,
                 queue_size=1)
 
+    def p_hit(self, z, d):
+        return 1/np.sqrt(2.*np.pi*self.sigma_hit**2.) * np.exp(-((z-d)**2.) / (2.*self.sigma_hit**2.))
+
+    def p_short(self, z, d):
+        res = np.zeros(shape=(self.table_width,self.table_width))
+        for (i,j) in zip(range(self.table_width),range(self.table_width)):
+            res[i,j] = 0. if d[i,j] == 0. or z[i,j] < 0. or d[i,j] < z[i,j] else 2./d[i,j] * (1-z[i,j]/d[i,j])
+        return res
+
+    def p_max(self, z):
+        res = np.zeros(shape=(self.table_width,self.table_width))
+        res[-1] = np.ones(shape=res[-1].shape)
+        return res
+
+    def p_rand(self, z):
+        return np.ones(shape=(self.table_width,self.table_width))*1/(self.table_width-1)
+
     def precompute_sensor_model(self):
         """
         Generate and store a table which represents the sensor model.
@@ -71,7 +90,14 @@ class SensorModel:
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
-        raise NotImplementedError
+        p_hit_table = np.fromfunction(lambda z,d: self.p_hit(z,d), (self.table_width, self.table_width))
+        norm_p_hit_table = p_hit_table/p_hit_table.sum(axis=1,keepdims=1)
+        p_short_table = np.fromfunction(lambda z,d: self.p_short(z,d), (self.table_width, self.table_width))
+        p_max_table = np.fromfunction(lambda z,d: self.p_max(z), (self.table_width, self.table_width))
+        p_rand_table = np.fromfunction(lambda z,d: self.p_rand(z), (self.table_width, self.table_width))
+        raw_sensor_model_table = self.alpha_hit*norm_p_hit_table + self.alpha_short*p_short_table + self.alpha_max*p_max_table + self.alpha_rand*p_rand_table
+        # raw_sensor_model_table = np.array([[self.prob(z,d) for z in range(self.table_width)] for d in range(self.table_width)])
+        self.sensor_model_table = raw_sensor_model_table/raw_sensor_model_table.sum(axis=1,keepdims=1)
 
     def evaluate(self, particles, observation):
         """
