@@ -55,8 +55,8 @@ class SensorModel:
                 self.map_callback,
                 queue_size=1)
 
-        # set the map resolution
-        # self.map_resolution = self.map.resolution # <- this is erroring because the map is not set until the callback runs
+        # Map resolution is updated in the map_topic's callback function
+        self.map_resolution = None
 
     def p_hit(self, z, d):
         return 1./np.sqrt(2.*np.pi*self.sigma_hit**2.) * np.exp(-((z-d)**2.) / (2.*self.sigma_hit**2.))
@@ -127,6 +127,7 @@ class SensorModel:
         if not self.map_set:
             return
 
+
         ####################################
         # TODO
         # Evaluate the sensor model here!
@@ -149,15 +150,15 @@ class SensorModel:
         probabilities = []
 
         # iterate over the number of particles
-        for i in range(len(scan)):
+        for i in range(len(scans)):
 
             # this is the cumulative product over the scans
             cumulative_probability = 1
 
             # iterate over the number of beams
-            for j in range(len(scan[i])):
+            for j in range(len(scans[i])):
 
-                current_d = scan[i][j]
+                current_d = scans[i][j]
                 current_beam = observation[j]
 
                 # does this convert to valid table indices?
@@ -198,5 +199,7 @@ class SensorModel:
 
         # Make the map set
         self.map_set = True
+
+        self.map_resolution = map_msg.info.resolution
 
         print("Map initialized")
