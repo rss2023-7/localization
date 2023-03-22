@@ -56,15 +56,16 @@ class SensorModel:
                 queue_size=1)
 
         # set the map resolution
-        self.map_resolution = self.map.resolution
+        # self.map_resolution = self.map.resolution # <- this is erroring because the map is not set until the callback runs
 
     def p_hit(self, z, d):
-        return 1/np.sqrt(2.*np.pi*self.sigma_hit**2.) * np.exp(-((z-d)**2.) / (2.*self.sigma_hit**2.))
+        return 1./np.sqrt(2.*np.pi*self.sigma_hit**2.) * np.exp(-((z-d)**2.) / (2.*self.sigma_hit**2.))
 
     def p_short(self, z, d):
         res = np.zeros(shape=(self.table_width,self.table_width))
-        for (i,j) in zip(range(self.table_width),range(self.table_width)):
-            res[i,j] = 0. if d[i,j] == 0. or z[i,j] < 0. or d[i,j] < z[i,j] else 2./d[i,j] * (1-z[i,j]/d[i,j])
+        for (i,j) in np.ndindex(res.shape):
+            if not (d[i,j] == 0. or z[i,j] < 0. or d[i,j] < z[i,j]):
+                res[i,j] = 2./d[i,j] * (1.-z[i,j]/d[i,j])
         return res
 
     def p_max(self, z):
@@ -73,7 +74,7 @@ class SensorModel:
         return res
 
     def p_rand(self, z):
-        return np.ones(shape=(self.table_width,self.table_width))*1/(self.table_width-1)
+        return np.ones(shape=(self.table_width,self.table_width))*1./(self.table_width-1)
 
     def precompute_sensor_model(self):
         """
@@ -95,13 +96,13 @@ class SensorModel:
             No return type. Directly modify `self.sensor_model_table`.
         """
         p_hit_table = np.fromfunction(lambda z,d: self.p_hit(z,d), (self.table_width, self.table_width))
-        norm_p_hit_table = p_hit_table/p_hit_table.sum(axis=1,keepdims=1)
+        norm_p_hit_table = p_hit_table/p_hit_table.sum(axis=0,keepdims=1)
         p_short_table = np.fromfunction(lambda z,d: self.p_short(z,d), (self.table_width, self.table_width))
         p_max_table = np.fromfunction(lambda z,d: self.p_max(z), (self.table_width, self.table_width))
         p_rand_table = np.fromfunction(lambda z,d: self.p_rand(z), (self.table_width, self.table_width))
         raw_sensor_model_table = self.alpha_hit*norm_p_hit_table + self.alpha_short*p_short_table + self.alpha_max*p_max_table + self.alpha_rand*p_rand_table
         # raw_sensor_model_table = np.array([[self.prob(z,d) for z in range(self.table_width)] for d in range(self.table_width)])
-        self.sensor_model_table = raw_sensor_model_table/raw_sensor_model_table.sum(axis=1,keepdims=1)
+        self.sensor_model_table = raw_sensor_model_table/raw_sensor_model_table.sum(axis=0,keepdims=1)
 
     def evaluate(self, particles, observation):
         """
