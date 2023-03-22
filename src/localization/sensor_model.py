@@ -101,7 +101,6 @@ class SensorModel:
         p_max_table = np.fromfunction(lambda z,d: self.p_max(z), (self.table_width, self.table_width))
         p_rand_table = np.fromfunction(lambda z,d: self.p_rand(z), (self.table_width, self.table_width))
         raw_sensor_model_table = self.alpha_hit*norm_p_hit_table + self.alpha_short*p_short_table + self.alpha_max*p_max_table + self.alpha_rand*p_rand_table
-        # raw_sensor_model_table = np.array([[self.prob(z,d) for z in range(self.table_width)] for d in range(self.table_width)])
         self.sensor_model_table = raw_sensor_model_table/raw_sensor_model_table.sum(axis=0,keepdims=1)
 
     def evaluate(self, particles, observation):
