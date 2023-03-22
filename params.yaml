@@ -25,4 +25,4 @@ particle_filter_frame: "/base_link_pf"
 deterministic: true
 
 # The write up says to do this
-lidar_scale_to_map_scale = 1.0
+lidar_scale_to_map_scale: 1.0
