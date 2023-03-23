@@ -157,23 +157,7 @@ class SensorModel:
 
         # iterate over the number of particles
         for i in range(len(scans)):
-
-            # this is the cumulative product over the scans
-            cumulative_probability = 1
-
-            # iterate over the number of beams
-            for j in range(len(scans[i])):
-
-                current_d = scans[i][j]
-                current_beam = observation[j]
-
-                # does this convert to valid table indices?
-                current_d = int(np.rint(current_d))
-                current_beam = int(np.rint(current_beam))
-
-                cumulative_probability *= self.sensor_model_table[current_beam][current_d]
-
-            probabilities[i] = cumulative_probability ** (1/2.2)
+            probabilities[i] = np.prod(self.sensor_model_table[np.rint(observation).astype(int), np.rint(scans[i]).astype(int)]) ** (1/2.2)
 
         return probabilities
 
