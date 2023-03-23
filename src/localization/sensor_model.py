@@ -138,7 +138,7 @@ class SensorModel:
 
         scans = self.scan_sim.scan(particles)
 
-        # downsample data 
+        # downsample data (do this first to prevent preprocessing data that will be removed!)
         observation = observation[::len(observation)/self.num_beams_per_particle]
         scans = scans[:,::scans.shape[1]/self.num_beams_per_particle]
 
@@ -146,21 +146,16 @@ class SensorModel:
         scans = scans / (self.lidar_scale_to_map_scale * self.map_resolution)
         observation = observation / (self.lidar_scale_to_map_scale * self.map_resolution)
 
-        # clip values outside [0, self.table_width-1]
+        # clip values to the range [0, self.table_width-1]
         scans = np.clip(scans, 0, self.table_width-1)
         observation = np.clip(observation, 0, self.table_width-1)
 
-        # TODO: replace for loops with indexing ops
+        # round all values to the nearest int
+        scans = np.rint(scans).astype(int)
+        observation = np.rint(observation).astype(int)
 
-	    # this is the list of probabilities that we are returning
-        probabilities = np.zeros(scans.shape[0])
-
-        # iterate over the number of particles
-        for i in range(len(scans)):
-            probabilities[i] = np.prod(self.sensor_model_table[np.rint(observation).astype(int), np.rint(scans[i]).astype(int)]) ** (1/2.2)
-
-        return probabilities
-
+        return self.sensor_model_table[observation, scans[0:scans.shape[0]]].prod(axis=1) ** (1/2.2)
+    
         ####################################
 
     def map_callback(self, map_msg):
