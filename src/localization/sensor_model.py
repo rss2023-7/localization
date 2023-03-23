@@ -146,10 +146,12 @@ class SensorModel:
             scans[i] = scans[i][::int(len(scans[i])/self.num_beams_per_particle)]
             if len(scans[i]) != self.num_beams_per_particle:
                 raise Exception("len(scans[i]) != self.num_beams_per_particle (off by "+str(len(scans[i])-self.num_beams_per_particle)+")")
+            
+        
 
         # scale meters to pixels
-        scans = np.divide(scans, self.lidar_scale_to_map_scale * self.map_resolution)
-        observation = np.divide(observation, self.lidar_scale_to_map_scale * self.map_resolution)
+        scans = scans / (self.lidar_scale_to_map_scale * self.map_resolution)
+        observation = observation / (self.lidar_scale_to_map_scale * self.map_resolution)
 
         # clip values outside [0, self.table_width-1]
         scans = np.clip(scans, 0, self.table_width-1)
@@ -170,16 +172,18 @@ class SensorModel:
             # iterate over the number of beams
             for j in range(len(scans[i])):
 
-                current_d = scans[i][j] / self.table_width
-                current_beam = observation[j] / self.table_width
+                current_d = scans[i][j]
+                current_beam = observation[j]
 
                 # does this convert to valid table indices?
-                current_d = int(current_d)
-                current_beam = int(current_beam)
+                current_d = int(np.rint(current_d))
+                current_beam = int(np.rint(current_beam))
 
-                cumulative_probability *= self.sensor_model_table[current_d][current_beam]
+                #cumulative_probability *= self.sensor_model_table[current_d][current_beam]
+                cumulative_probability *= self.sensor_model_table[current_beam][current_d]
 
-            probabilities.append(cumulative_probability)
+
+            probabilities.append(cumulative_probability ** (1/2.2))
 
         return probabilities
 
