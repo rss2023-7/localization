@@ -155,6 +155,9 @@ class SensorModel:
         scans = np.clip(scans, 0, self.table_width-1)
         observation = np.clip(observation, 0, self.table_width-1)
 
+        # TODO: replace list with np array
+        # TODO: replace for loops with indexing ops
+
 	    # this is the list of probabilities that we are returning
         probabilities = []
 
@@ -167,8 +170,8 @@ class SensorModel:
             # iterate over the number of beams
             for j in range(len(scans[i])):
 
-                current_d = scans[i][j]
-                current_beam = observation[j]
+                current_d = scans[i][j] / self.table_width
+                current_beam = observation[j] / self.table_width
 
                 # does this convert to valid table indices?
                 current_d = int(current_d)
