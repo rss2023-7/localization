@@ -138,16 +138,9 @@ class SensorModel:
 
         scans = self.scan_sim.scan(particles)
 
-        # downsample data
-        observation = observation[::int(len(observation)/self.num_beams_per_particle)]
-        if len(observation) != self.num_beams_per_particle:
-            raise Exception("len(observation) != self.num_beams_per_particle (off by "+str(len(observation)-self.num_beams_per_particle)+")")
-        for i in range(len(scans)):
-            scans[i] = scans[i][::int(len(scans[i])/self.num_beams_per_particle)]
-            if len(scans[i]) != self.num_beams_per_particle:
-                raise Exception("len(scans[i]) != self.num_beams_per_particle (off by "+str(len(scans[i])-self.num_beams_per_particle)+")")
-            
-        
+        # downsample data 
+        observation = observation[::len(observation)/self.num_beams_per_particle]
+        scans = scans[:,::scans.shape[1]/self.num_beams_per_particle]
 
         # scale meters to pixels
         scans = scans / (self.lidar_scale_to_map_scale * self.map_resolution)
@@ -157,11 +150,10 @@ class SensorModel:
         scans = np.clip(scans, 0, self.table_width-1)
         observation = np.clip(observation, 0, self.table_width-1)
 
-        # TODO: replace list with np array
         # TODO: replace for loops with indexing ops
 
 	    # this is the list of probabilities that we are returning
-        probabilities = []
+        probabilities = np.zeros(scans.shape[0])
 
         # iterate over the number of particles
         for i in range(len(scans)):
@@ -179,11 +171,9 @@ class SensorModel:
                 current_d = int(np.rint(current_d))
                 current_beam = int(np.rint(current_beam))
 
-                #cumulative_probability *= self.sensor_model_table[current_d][current_beam]
                 cumulative_probability *= self.sensor_model_table[current_beam][current_d]
 
-
-            probabilities.append(cumulative_probability ** (1/2.2))
+            probabilities[i] = cumulative_probability ** (1/2.2)
 
         return probabilities
 
