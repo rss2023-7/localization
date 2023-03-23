@@ -138,6 +138,15 @@ class SensorModel:
 
         scans = self.scan_sim.scan(particles)
 
+        # downsample data
+        observation = observation[::int(len(observation)/self.num_beams_per_particle)]
+        if len(observation) != self.num_beams_per_particle:
+            raise Exception("len(observation) != self.num_beams_per_particle (off by "+str(len(observation)-self.num_beams_per_particle)+")")
+        for i in range(len(scans)):
+            scans[i] = scans[i][::int(len(scans[i])/self.num_beams_per_particle)]
+            if len(scans[i]) != self.num_beams_per_particle:
+                raise Exception("len(scans[i]) != self.num_beams_per_particle (off by "+str(len(scans[i])-self.num_beams_per_particle)+")")
+
         # scale meters to pixels
         scans = np.divide(scans, self.lidar_scale_to_map_scale * self.map_resolution)
         observation = np.divide(observation, self.lidar_scale_to_map_scale * self.map_resolution)
@@ -146,7 +155,7 @@ class SensorModel:
         scans = np.clip(scans, 0, self.table_width-1)
         observation = np.clip(observation, 0, self.table_width-1)
 
-	# this is the list of probabilities that we are returning
+	    # this is the list of probabilities that we are returning
         probabilities = []
 
         # iterate over the number of particles
