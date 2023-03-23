@@ -12,6 +12,8 @@ class MotionModel:
         # Update the particles to reflect probable future states given the odometry data
         num_particles = len(particles)
 
+        # NOTE: python for loops are slow as shit, if we need to optimize efficiency
+        # we could changes our noise to an np array and use np operations
         for i in range(num_particles):
             # Add noise to the odometry data
             noisy_odometry = np.copy(odometry)
