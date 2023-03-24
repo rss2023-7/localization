@@ -6,6 +6,8 @@ from sensor_model import SensorModel
 from motion_model import MotionModel
 from collections import defaultdict
 
+import matplotlib.pyplot as plt
+
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -92,10 +94,11 @@ class ParticleFilter:
         initial_x = initial_pose.position.x
         initial_y = initial_pose.position.y
         initial_theta, _, _ = trans.rotation_from_matrix(trans.quaternion_matrix([initial_pose.orientation.x, initial_pose.orientation.y, initial_pose.orientation.z, initial_pose.orientation.w]))
+        rospy.loginfo(str(initial_x)+" "+str(initial_y)+" "+str(initial_theta))
         self.particles = np.hstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
                                     np.random.normal(initial_y, .5, (self.num_particles, 1)),
                                     np.random.normal(initial_theta, .5, (self.num_particles, 1))))
-        rospy.loginfo(self.particles)
+        self.compute_particle_avg()
 
     def laser_callback(self, laser_msg):
         """
@@ -126,10 +129,13 @@ class ParticleFilter:
         Returns an [x, y, theta] from taking the average of self.particles
         """
 
-        discretization_factor = 100
+        bucket_size = 0.5
+        discretization_factor_x = (np.max(self.particles[:,0]) - np.min(self.particles[:,0])) / bucket_size
+        discretization_factor_y = (np.max(self.particles[:,1]) - np.min(self.particles[:,1])) / bucket_size
 
-        x_y_indices = np.array([self.particles[0] // discretization_factor, 
-                               self.particles[1] // discretization_factor])
+
+        x_y_indices = np.array([self.particles[:,0] // discretization_factor_x, 
+                               self.particles[:,1] // discretization_factor_y])
 
         coord_freq = defaultdict(int)
         for i in range(x_y_indices.shape[1]):
@@ -140,18 +146,20 @@ class ParticleFilter:
 
         avg_x = 0
         avg_y = 0
-        avg_theta = 0
+        thetas = []
         count = 0
         for i in range(self.particles.shape[1]):
-            if (self.particles[0][i] // discretization_factor == most_freq_key[0] and 
-                self.particles[1][i] // discretization_factor  == most_freq_key[1]):
-                avg_x += self.particles[0][i]
-                avg_y += self.particles[1][i]
-                avg_theta += self.particles[2][i]
+            if (self.particles[i,0] // discretization_factor_x == most_freq_key[0] and 
+                self.particles[i,1] // discretization_factor_y  == most_freq_key[1]):
+                avg_x += self.particles[i,0]
+                avg_y += self.particles[i,1]
+                thetas.append(self.particles[i,2])
+
                 count += 1
 
-        print("avg is "+str([avg_x / count, avg_theta / count, avg_theta / count]))
-        return [avg_x / count, avg_theta / count, avg_theta / count]
+        avg_theta = np.angle(np.sum(np.exp(np.array(thetas) * 1j)))
+
+        return [avg_x / count, avg_y / count, avg_theta]
 
 
         # grid_map = defaultdict(int)
