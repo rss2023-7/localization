@@ -9,6 +9,7 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
+import tf.transformations as trans
 
 class ParticleFilter:
 
@@ -31,10 +32,10 @@ class ParticleFilter:
         odom_topic = rospy.get_param("~odom_topic", "/odom")
 
         self.laser_sub = rospy.Subscriber(scan_topic, LaserScan,
-                                          self.laser_callback(), # TODO: Fill this in
+                                          self.laser_callback, # TODO: Fill this in
                                           queue_size=1)
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry,
-                                          self.odom_callback(), # TODO: Fill this in
+                                          self.odom_callback, # TODO: Fill this in
                                           queue_size=1)
 
         #  *Important Note #2:* You must respond to pose
@@ -43,7 +44,7 @@ class ParticleFilter:
         #     "Pose Estimate" feature in RViz, which publishes to
         #     /initialpose.
         self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped,
-                                          self.generate_particles(), # TODO: Fill this in
+                                          self.generate_particles, # TODO: Fill this in
                                           queue_size=1)
 
         #  *Important Note #3:* You must publish your pose estimate to
@@ -59,7 +60,7 @@ class ParticleFilter:
         self.sensor_model = SensorModel()
 
         # Initialize the particles
-        self.particles = self.generate_particles()
+        # self.particles = self.generate_particles()
 
         # Implement the MCL algorithm
         # using the sensor model and the motion model
@@ -71,18 +72,25 @@ class ParticleFilter:
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
 
-    def generate_particles(self):
+    def generate_particles(self, initial_pose_msg):
         """
         Generates a matrix of particles for the filter at initialization
 
-        returns:
+        modifies:
             particles: An Nx3 matrix of the form:
 
                 [x0 y0 theta0]
                 [x1 y0 theta1]
                 [    ...     ]
         """
-        return np.zeros(3, self.num_particles)
+        initial_pose = initial_pose_msg.pose.pose
+        initial_x = initial_pose.position.x
+        initial_y = initial_pose.position.y
+        initial_theta, _, _ = trans.rotation_from_matrix(trans.quaternion_matrix([initial_pose.orientation.x, initial_pose.orientation.y, initial_pose.orientation.z, initial_pose.orientation.w]))
+        self.particles = np.vstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
+                                    np.random.normal(initial_y, .5, (self.num_particles, 1)),
+                                    np.random.normal(initial_theta, .5, (self.num_particles, 1))))
+        rospy.loginfo(self.particles)
 
     def laser_callback(self, laser_msg):
         """
