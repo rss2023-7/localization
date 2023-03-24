@@ -109,10 +109,10 @@ class ParticleFilter:
 
         """
         probs = self.sensor_model.evaluate(laser_msg.ranges)
-        self.particles = np.random.choice(self.particles, self.num_particles, probs) +
-                            np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
+        self.particles = (np.random.choice(self.particles, self.num_particles, probs) + 
+                                       np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)),
-                                       np.random.normal(0, .5, (self.num_particles, 1))))
+                                       np.random.normal(0, .5, (self.num_particles, 1)))))
 
 
     def odom_callback(self, odom_msg):
@@ -163,32 +163,18 @@ class ParticleFilter:
 
         avg_theta = np.angle(np.sum(np.exp(np.array(thetas) * 1j)))
 
-        return [avg_x / count, avg_y / count, avg_theta]
+        odom_msg = Odometry()
+        odom_msg.pose.position.x = avg_x / count
+        odom_msg.pose.position.y = avg_y / count
+        odom_msg.pose.position.z = 0
 
+        quaternion = trans.quaternion_about_axis(avg_theta, (0,0,1))
+        odom_msg.pose.quaternion.x = quaternion[0]
+        odom_msg.pose.quaternion.y = quaternion[1]
+        odom_msg.pose.quaternion.z = quaternion[2]
+        odom_msg.pose.quaternion.w = quaternion[3]
 
-        # grid_map = defaultdict(int)
-
-        # # enter all the x/y pairs into the grid
-        # for particle_vect in self.particles:
-        #     bucket_key = (particle_vect[0] // discretization_factor, particle_vect[1] // discretization_factor, particle_vect[2])
-        #     grid_map[bucket_key] += 1
-
-        # # find the bucket key with the highest number of entries
-        # highest_bucket_key = max(grid_map, key=grid_map.get)
-
-        # # take the average of all x/y pairs within the most densely populated bucket
-        # coords_to_avg = [np.empty([2, 3])]
-        # for bucket_key in grid_map.keys():
-        #     if bucket_key[0] >= highest_bucket_key[0] and bucket_key[0] <= highest_bucket_key[0] + discretization_factor:
-        #         if bucket_key[1] >= highest_bucket_key[1] and bucket_key[1] <= highest_bucket_key[1] + discretization_factor:
-        #             coords_to_avg = np.vstack([coords_to_avg, [bucket_key[0], bucket_key[1], bucket_key[2]]])
-
-        # return [np.mean(coords_to_avg[:0]), np.mean(coords_to_avg[:1]), np.mean(coords_to_avg[:2])]
-    
-
-        return None
-
-
+        self.odom_pub.publish(odom_msg)
     
     
 if __name__ == "__main__":
