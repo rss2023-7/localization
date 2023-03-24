@@ -128,14 +128,7 @@ class SensorModel:
             return
 
 
-        ####################################
-        # TODO
-        # Evaluate the sensor model here!
-        #
-        # You will probably want to use this function
-        # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
-
         scans = self.scan_sim.scan(particles)
 
         # downsample data (do this first to prevent preprocessing data that will be removed!)
@@ -156,7 +149,6 @@ class SensorModel:
 
         return self.sensor_model_table[observation, scans[0:scans.shape[0]]].prod(axis=1) ** (1/2.2)
     
-        ####################################
 
     def map_callback(self, map_msg):
         # Convert the map to a numpy array
