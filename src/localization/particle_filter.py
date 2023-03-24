@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import numpy as np
 import rospy
 from sensor_model import SensorModel
 from motion_model import MotionModel
@@ -15,6 +16,7 @@ class ParticleFilter:
         # Get parameters
         self.particle_filter_frame = \
                 rospy.get_param("~particle_filter_frame")
+        self.num_particles  = rospy.get_param("~num_particles")
 
         # Initialize publishers/subscribers
         #
@@ -27,6 +29,7 @@ class ParticleFilter:
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
         odom_topic = rospy.get_param("~odom_topic", "/odom")
+
         self.laser_sub = rospy.Subscriber(scan_topic, LaserScan,
                                           YOUR_LIDAR_CALLBACK, # TODO: Fill this in
                                           queue_size=1)
@@ -55,6 +58,9 @@ class ParticleFilter:
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
 
+        # Initialize the particles
+        self.particles = self.generate_particles()
+
         # Implement the MCL algorithm
         # using the sensor model and the motion model
         #
@@ -65,7 +71,40 @@ class ParticleFilter:
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
 
+    def generate_particles(self):
+        """
+        Generates a matrix of particles for the filter at initialization
 
+        returns:
+            particles: An Nx3 matrix of the form:
+
+                [x0 y0 theta0]
+                [x1 y0 theta1]
+                [    ...     ]
+        """
+        return np.zeros(3, self.num_particles)
+
+    def laser_callback(self, laser_msg):
+        """
+        Updates the probabilities of the filter particles
+
+        args:
+            laser_msg: A LaserScan msg object
+
+        """
+        self.sensor_model.evaluate(laser_msg.ranges)
+
+
+    def odom_callback(self, odom_msg):
+        """
+        Update the particle positions of the filter
+
+        args:
+            odom_msg: A Odometry msg
+        """
+        self.motion_model.evaluate(self.particles, )
+    
+    
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
     pf = ParticleFilter()
