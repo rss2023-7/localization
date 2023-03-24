@@ -150,6 +150,7 @@ class ParticleFilter:
                 avg_theta += self.particles[2][i]
                 count += 1
 
+        print("avg is "+str([avg_x / count, avg_theta / count, avg_theta / count]))
         return [avg_x / count, avg_theta / count, avg_theta / count]
 
 
