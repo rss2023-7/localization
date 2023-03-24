@@ -10,6 +10,7 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
+import tf.transformations as trans
 
 class ParticleFilter:
 
@@ -76,19 +77,25 @@ class ParticleFilter:
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
 
-    def generate_particles(self, pose_msg):
+    def generate_particles(self, initial_pose_msg):
         """
         Generates a matrix of particles for the filter at initialization
 
-        returns:
+        modifies:
             particles: An Nx3 matrix of the form:
 
                 [x0 y0 theta0]
                 [x1 y0 theta1]
                 [    ...     ]
         """
-        self.particles = np.zeros((3, self.num_particles))
-        print(self.compute_particle_avg())
+        initial_pose = initial_pose_msg.pose.pose
+        initial_x = initial_pose.position.x
+        initial_y = initial_pose.position.y
+        initial_theta, _, _ = trans.rotation_from_matrix(trans.quaternion_matrix([initial_pose.orientation.x, initial_pose.orientation.y, initial_pose.orientation.z, initial_pose.orientation.w]))
+        self.particles = np.vstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
+                                    np.random.normal(initial_y, .5, (self.num_particles, 1)),
+                                    np.random.normal(initial_theta, .5, (self.num_particles, 1))))
+        rospy.loginfo(self.particles)
 
     def laser_callback(self, laser_msg):
         """
