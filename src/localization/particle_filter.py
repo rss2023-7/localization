@@ -108,7 +108,11 @@ class ParticleFilter:
             laser_msg: A LaserScan msg object
 
         """
-        self.sensor_model.evaluate(laser_msg.ranges)
+        probs = self.sensor_model.evaluate(laser_msg.ranges)
+        self.particles = np.random.choice(self.particles, self.num_particles, probs) +
+                            np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
+                                       np.random.normal(0, .5, (self.num_particles, 1)),
+                                       np.random.normal(0, .5, (self.num_particles, 1))))
 
 
     def odom_callback(self, odom_msg):
@@ -122,7 +126,7 @@ class ParticleFilter:
         # create the [dx, dy, dtheta] from the odom msg
         odom_list = self.rate * np.array([odom_msg.twist.linear.x, odom_msg.twist.linear.y, odom_msg.twist.angular.z])
 
-        self.motion_model.evaluate(self.particles, odom_list)
+        self.particles = self.motion_model.evaluate(self.particles, odom_list)
 
     def compute_particle_avg(self):
         """
