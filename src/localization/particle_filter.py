@@ -92,7 +92,7 @@ class ParticleFilter:
         initial_x = initial_pose.position.x
         initial_y = initial_pose.position.y
         initial_theta, _, _ = trans.rotation_from_matrix(trans.quaternion_matrix([initial_pose.orientation.x, initial_pose.orientation.y, initial_pose.orientation.z, initial_pose.orientation.w]))
-        self.particles = np.vstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
+        self.particles = np.hstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
                                     np.random.normal(initial_y, .5, (self.num_particles, 1)),
                                     np.random.normal(initial_theta, .5, (self.num_particles, 1))))
         rospy.loginfo(self.particles)
