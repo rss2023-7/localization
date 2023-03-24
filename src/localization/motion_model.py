@@ -3,7 +3,7 @@ from math import sin, cos, atan2
 
 class MotionModel:
 
-    def __init__(self, sigma_x=0.05, sigma_y=0.05, sigma_theta=0.05):
+    def __init__(self, sigma_x=0.0025, sigma_y=0.0025, sigma_theta=0.0025):
         """
         Initialize the motion model with noise coefficients.
         args:
