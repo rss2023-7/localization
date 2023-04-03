@@ -6,6 +6,10 @@ from sensor_model import SensorModel
 from motion_model import MotionModel
 from collections import defaultdict
 
+import tf2_ros
+import tf.transformations as trans
+from geometry_msgs.msg import TransformStamped
+
 import matplotlib.pyplot as plt
 
 from sensor_msgs.msg import LaserScan
@@ -23,6 +27,10 @@ class ParticleFilter:
         self.rate = 20
         self.particles = None
         rospy.Rate(self.rate)
+
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster()
 
         # Get parameters
         self.particle_filter_frame = \
@@ -121,6 +129,8 @@ class ParticleFilter:
                                        np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)))))
+        
+        self.compute_particle_avg()
 
 
     def odom_callback(self, odom_msg):
@@ -139,13 +149,14 @@ class ParticleFilter:
 
         self.particles = self.motion_model.evaluate(self.particles, odom_list)
 
+        self.compute_particle_avg()
+
+
     def compute_particle_avg(self):
         """
         Returns an [x, y, theta] from taking the average of self.particles
         """
         
-        rospy.loginfo("we are computing an avg")
-
         bucket_size = 0.5
         discretization_factor_x = (np.max(self.particles[:,0]) - np.min(self.particles[:,0])) / bucket_size
         discretization_factor_y = (np.max(self.particles[:,1]) - np.min(self.particles[:,1])) / bucket_size
@@ -164,7 +175,7 @@ class ParticleFilter:
         avg_x = 0
         avg_y = 0
         thetas = []
-        count = 0
+        count = coord_freq[most_freq_key]
         for i in range(self.particles.shape[1]):
             if (self.particles[i,0] // discretization_factor_x == most_freq_key[0] and 
                 self.particles[i,1] // discretization_factor_y  == most_freq_key[1]):
@@ -172,7 +183,6 @@ class ParticleFilter:
                 avg_y += self.particles[i,1]
                 thetas.append(self.particles[i,2])
 
-                count += 1
 
         avg_theta = np.angle(np.sum(np.exp(np.array(thetas) * 1j)))
 
@@ -188,6 +198,31 @@ class ParticleFilter:
         odom_msg.pose.pose.orientation.w = quaternion[3]
 
         self.odom_pub.publish(odom_msg)
+
+        # do the frame conversion
+        try:
+            world_to_map_trans_msg = self.tf_buffer.lookupTransform("world", "map", rospy.Time())
+        except:
+            pass
+
+        # quat = world_to_map_trans_msg.transform.rotation
+
+        empty_trans = TransformStamped()
+        empty_trans.header.stamp = rospy.Time.now()
+        empty_trans.header.frame_id = "map"
+        empty_trans.child_frame_id = "base_link_pf"
+        t = empty_trans.header.stamp.to_sec()
+        empty_trans.transform.translation.x = 0
+        empty_trans.transform.translation.y = 0
+        empty_trans.transform.translation.z = 0
+        quat = trans.quaternion_from_matrix(np.eye(4))
+        empty_trans.transform.rotation.x = quat[0]
+        empty_trans.transform.rotation.y = quat[1]
+        empty_trans.transform.rotation.z = quat[2]
+        empty_trans.transform.rotation.w = quat[3]
+        self.tf_broadcaster.sendTransform(empty_trans)
+
+
     
     
 if __name__ == "__main__":
