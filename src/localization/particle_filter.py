@@ -182,10 +182,10 @@ class ParticleFilter:
         odom_msg.pose.pose.position.z = 0
 
         quaternion = trans.quaternion_about_axis(avg_theta, (0,0,1))
-        odom_msg.pose.pose.quaternion.x = quaternion[0]
-        odom_msg.pose.pose.quaternion.y = quaternion[1]
-        odom_msg.pose.pose.quaternion.z = quaternion[2]
-        odom_msg.pose.pose.quaternion.w = quaternion[3]
+        odom_msg.pose.pose.orientation.x = quaternion[0]
+        odom_msg.pose.pose.orientation.y = quaternion[1]
+        odom_msg.pose.pose.orientation.z = quaternion[2]
+        odom_msg.pose.pose.orientation.w = quaternion[3]
 
         self.odom_pub.publish(odom_msg)
     
