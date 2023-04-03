@@ -128,6 +128,9 @@ class ParticleFilter:
             odom_msg: A Odometry msg
         """
 
+        if self.particles is None:
+            return
+
         # create the [dx, dy, dtheta] from the odom msg
         odom_list = self.rate * np.array([odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.angular.z])
 
