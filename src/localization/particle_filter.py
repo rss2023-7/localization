@@ -63,6 +63,7 @@ class ParticleFilter:
         self.sensor_model = SensorModel()
 
         self.rate = 20
+        self.particles = None
 
         rospy.Rate(self.rate)
 
@@ -108,6 +109,10 @@ class ParticleFilter:
             laser_msg: A LaserScan msg object
 
         """
+
+        if self.particles is None:
+            return
+
         probs = self.sensor_model.evaluate(self.particles, laser_msg.ranges)
         self.particles = (np.random.choice(self.particles, self.num_particles, probs) + 
                                        np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
