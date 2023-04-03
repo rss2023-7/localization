@@ -17,6 +17,13 @@ import tf.transformations as trans
 class ParticleFilter:
 
     def __init__(self):
+
+
+        # init stuff
+        self.rate = 20
+        self.particles = None
+        rospy.Rate(self.rate)
+
         # Get parameters
         self.particle_filter_frame = \
                 rospy.get_param("~particle_filter_frame")
@@ -61,11 +68,6 @@ class ParticleFilter:
         # Initialize the models
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
-
-        self.rate = 20
-        self.particles = None
-
-        rospy.Rate(self.rate)
 
         # Initialize the particles
         # self.particles = self.generate_particles()
@@ -113,8 +115,9 @@ class ParticleFilter:
         if self.particles is None:
             return
 
-        probs = self.sensor_model.evaluate(self.particles, laser_msg.ranges)
-        self.particles = (np.random.choice(self.particles, self.num_particles, probs) + 
+        probs = self.sensor_model.evaluate(self.particles, np.array(laser_msg.ranges))
+        probs = probs / np.sum(probs)
+        self.particles = (self.particles[np.random.choice(self.num_particles, size=self.num_particles, p=probs)] + 
                                        np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)))))
@@ -140,6 +143,8 @@ class ParticleFilter:
         """
         Returns an [x, y, theta] from taking the average of self.particles
         """
+        
+        rospy.loginfo("we are computing an avg")
 
         bucket_size = 0.5
         discretization_factor_x = (np.max(self.particles[:,0]) - np.min(self.particles[:,0])) / bucket_size
@@ -172,15 +177,15 @@ class ParticleFilter:
         avg_theta = np.angle(np.sum(np.exp(np.array(thetas) * 1j)))
 
         odom_msg = Odometry()
-        odom_msg.pose.position.x = avg_x / count
-        odom_msg.pose.position.y = avg_y / count
-        odom_msg.pose.position.z = 0
+        odom_msg.pose.pose.position.x = avg_x / count
+        odom_msg.pose.pose.position.y = avg_y / count
+        odom_msg.pose.pose.position.z = 0
 
         quaternion = trans.quaternion_about_axis(avg_theta, (0,0,1))
-        odom_msg.pose.quaternion.x = quaternion[0]
-        odom_msg.pose.quaternion.y = quaternion[1]
-        odom_msg.pose.quaternion.z = quaternion[2]
-        odom_msg.pose.quaternion.w = quaternion[3]
+        odom_msg.pose.pose.quaternion.x = quaternion[0]
+        odom_msg.pose.pose.quaternion.y = quaternion[1]
+        odom_msg.pose.pose.quaternion.z = quaternion[2]
+        odom_msg.pose.pose.quaternion.w = quaternion[3]
 
         self.odom_pub.publish(odom_msg)
     
