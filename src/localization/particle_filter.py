@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import tf2_ros
 import tf.transformations as trans
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, PoseArray, Pose
 
 import matplotlib.pyplot as plt
 
@@ -31,6 +31,10 @@ class ParticleFilter:
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
+
+        # Initialize the models
+        self.motion_model = MotionModel()
+        self.sensor_model = SensorModel()
 
         # Get parameters
         self.particle_filter_frame = \
@@ -72,10 +76,8 @@ class ParticleFilter:
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
-        
-        # Initialize the models
-        self.motion_model = MotionModel()
-        self.sensor_model = SensorModel()
+
+        self.points_pub = rospy.Publisher("/pf/points", PoseArray, queue_size = 1)
 
         # Initialize the particles
         # self.particles = self.generate_particles()
@@ -156,7 +158,26 @@ class ParticleFilter:
         """
         Returns an [x, y, theta] from taking the average of self.particles
         """
-        
+
+        pose_arr_msg = PoseArray()
+        pose_arr_msg.header.stamp = rospy.Time.now()
+        pose_arr_msg.header.frame_id = "map"
+        pose_arr = []
+        for particle in self.particles:
+            pose = Pose()
+            pose.position.x = particle[0]
+            pose.position.y = particle[1]
+            pose.position.z = 0
+
+            quaternion = trans.quaternion_about_axis(particle[2], (0,0,1))
+            pose.orientation.x = quaternion[0]
+            pose.orientation.y = quaternion[1]
+            pose.orientation.z = quaternion[2]
+            pose.orientation.w = quaternion[3]
+            pose_arr.append(pose)
+        pose_arr_msg.poses = pose_arr
+        self.points_pub.publish(pose_arr_msg)
+
         bucket_size = 0.5
         discretization_factor_x = (np.max(self.particles[:,0]) - np.min(self.particles[:,0])) / bucket_size
         discretization_factor_y = (np.max(self.particles[:,1]) - np.min(self.particles[:,1])) / bucket_size
@@ -164,21 +185,24 @@ class ParticleFilter:
 
         x_y_indices = np.array([self.particles[:,0] // discretization_factor_x, 
                                self.particles[:,1] // discretization_factor_y])
+        x_y_indices = np.transpose(x_y_indices)
+        # rospy.loginfo(str(x_y_indices))
 
         coord_freq = defaultdict(int)
-        for i in range(x_y_indices.shape[1]):
-            coord_freq[(x_y_indices[0][i], x_y_indices[1][i])] += 1
+        for i in range(self.num_particles):
+            coord_freq[(x_y_indices[i,0], x_y_indices[i,1])] += 1
     
-
         most_freq_key = max(coord_freq, key=coord_freq.get)
+        # rospy.loginfo(most_freq_key)
 
         avg_x = 0
         avg_y = 0
         thetas = []
         count = coord_freq[most_freq_key]
-        for i in range(self.particles.shape[1]):
+        # count = self.num_particles
+        for i in range(self.num_particles):
             if (self.particles[i,0] // discretization_factor_x == most_freq_key[0] and 
-                self.particles[i,1] // discretization_factor_y  == most_freq_key[1]):
+                self.particles[i,1] // discretization_factor_y == most_freq_key[1]):
                 avg_x += self.particles[i,0]
                 avg_y += self.particles[i,1]
                 thetas.append(self.particles[i,2])
@@ -187,6 +211,8 @@ class ParticleFilter:
         avg_theta = np.angle(np.sum(np.exp(np.array(thetas) * 1j)))
 
         odom_msg = Odometry()
+        odom_msg.header.stamp = rospy.Time.now()
+        odom_msg.header.frame_id = "map"
         odom_msg.pose.pose.position.x = avg_x / count
         odom_msg.pose.pose.position.y = avg_y / count
         odom_msg.pose.pose.position.z = 0
@@ -198,29 +224,41 @@ class ParticleFilter:
         odom_msg.pose.pose.orientation.w = quaternion[3]
 
         self.odom_pub.publish(odom_msg)
+        rospy.loginfo("most populated: "+str(most_freq_key[0]*discretization_factor_x)+","+str(most_freq_key[1]*discretization_factor_y))
+        rospy.loginfo("avg: "+str(odom_msg.pose.pose.position.x)+", "+str(odom_msg.pose.pose.position.y)+", "+str(avg_theta))
 
         # do the frame conversion
-        try:
-            world_to_map_trans_msg = self.tf_buffer.lookupTransform("world", "map", rospy.Time())
-        except:
-            pass
+        # world_to_base_link = trans.quaternion_matrix(quaternion)
+        # world_to_base_link[0,3] = odom_msg.pose.pose.position.x
+        # world_to_base_link[1,3] = odom_msg.pose.pose.position.y
+        # world_to_base_link[2,3] = odom_msg.pose.pose.position.z
 
+        # world_to_map_trans_msg = self.tf_buffer.lookup_transform("/world", "map", rospy.Time())
+        # print("success")
         # quat = world_to_map_trans_msg.transform.rotation
+        # world_to_map_matrix = trans.quaternion_matrix([quat.x, quat.y, quat.z, quat.w])
+        # translation = world_to_map_trans_msg.transform.translation
+        # world_to_map_matrix[0,3] = translation.x
+        # world_to_map_matrix[1,3] = translation.y
+        # world_to_map_matrix[2,3] = translation.z
+        # map_to_base_link = np.matmul(np.linalg.inv(world_to_map_matrix), world_to_base_link)
 
-        empty_trans = TransformStamped()
-        empty_trans.header.stamp = rospy.Time.now()
-        empty_trans.header.frame_id = "map"
-        empty_trans.child_frame_id = "base_link_pf"
-        t = empty_trans.header.stamp.to_sec()
-        empty_trans.transform.translation.x = 0
-        empty_trans.transform.translation.y = 0
-        empty_trans.transform.translation.z = 0
-        quat = trans.quaternion_from_matrix(np.eye(4))
-        empty_trans.transform.rotation.x = quat[0]
-        empty_trans.transform.rotation.y = quat[1]
-        empty_trans.transform.rotation.z = quat[2]
-        empty_trans.transform.rotation.w = quat[3]
-        self.tf_broadcaster.sendTransform(empty_trans)
+        map_to_base_link_trans = TransformStamped()
+        map_to_base_link_trans.header.stamp = rospy.Time.now()
+        map_to_base_link_trans.header.frame_id = "map"
+        map_to_base_link_trans.child_frame_id = "base_link_pf"
+        t = map_to_base_link_trans.header.stamp.to_sec()
+        map_to_base_link_trans.transform.translation.x = odom_msg.pose.pose.position.x
+        map_to_base_link_trans.transform.translation.y = odom_msg.pose.pose.position.y
+        map_to_base_link_trans.transform.translation.z = odom_msg.pose.pose.position.z
+        # quat = trans.quaternion_from_matrix(map_to_base_link)
+        map_to_base_link_trans.transform.rotation.x = quaternion[0]
+        map_to_base_link_trans.transform.rotation.y = quaternion[1]
+        map_to_base_link_trans.transform.rotation.z = quaternion[2]
+        map_to_base_link_trans.transform.rotation.w = quaternion[3]
+        self.tf_broadcaster.sendTransform(map_to_base_link_trans)
+        # print("great success")
+
 
 
     
