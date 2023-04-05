@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from std_msgs.msg import Float32
 
 import tf.transformations as trans
 
@@ -59,6 +60,8 @@ class ParticleFilter:
         self.odom_sub  = rospy.Subscriber(odom_topic, Odometry,
                                           self.odom_callback, # TODO: Fill this in
                                           queue_size=1)
+        
+
 
         #  *Important Note #2:* You must respond to pose
         #     initialization requests sent to the /initialpose
@@ -78,6 +81,9 @@ class ParticleFilter:
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
 
         self.points_pub = rospy.Publisher("/pf/points", PoseArray, queue_size = 1)
+
+        self.error_pub = rospy.Publisher("/linear_error", Float32, queue_size = 1)
+
 
         # Initialize the particles
         # self.particles = self.generate_particles()
@@ -240,6 +246,20 @@ class ParticleFilter:
         map_to_base_link_trans.transform.rotation.z = quaternion[2]
         map_to_base_link_trans.transform.rotation.w = quaternion[3]
         self.tf_broadcaster.sendTransform(map_to_base_link_trans)
+
+        # get the ground truth transformation
+        rospy.loginfo("trying to publish data")
+        try:
+            ground_truth_pose = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time())
+            ground_truth_x = ground_truth_pose.transform.translation.x
+            ground_truth_y = ground_truth_pose.transform.translation.y
+
+            euclidean_dist_error = np.sqrt((ground_truth_x-odom_msg.pose.pose.position.x) ** 2+(ground_truth_y-odom_msg.pose.pose.position.y) ** 2)
+            self.error_pub.publish(euclidean_dist_error)
+
+        except Exception,e:
+            rospy.loginfo(str(e))
+            pass
     
     
 if __name__ == "__main__":
