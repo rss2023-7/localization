@@ -114,8 +114,8 @@ class ParticleFilter:
         initial_y = initial_pose.position.y
         initial_theta, _, _ = trans.rotation_from_matrix(trans.quaternion_matrix([initial_pose.orientation.x, initial_pose.orientation.y, initial_pose.orientation.z, initial_pose.orientation.w]))
         # rospy.loginfo(str(initial_x)+" "+str(initial_y)+" "+str(initial_theta))
-        self.particles = np.hstack((np.random.normal(initial_x, .5, (self.num_particles, 1)),
-                                    np.random.normal(initial_y, .5, (self.num_particles, 1)),
+        self.particles = np.hstack((np.random.normal(initial_x, .25, (self.num_particles, 1)),
+                                    np.random.normal(initial_y, .25, (self.num_particles, 1)),
                                     np.random.normal(initial_theta, .5, (self.num_particles, 1))))
         self.compute_particle_avg()
 
@@ -133,9 +133,10 @@ class ParticleFilter:
 
         probs = self.sensor_model.evaluate(self.particles, np.array(laser_msg.ranges))
         probs = probs / np.sum(probs)
+        # self.particles = (self.particles[np.random.choice(self.num_particles, size=self.num_particles, p=probs)])
         self.particles = (self.particles[np.random.choice(self.num_particles, size=self.num_particles, p=probs)] + 
-                                       np.hstack((np.random.normal(0, .5, (self.num_particles, 1)),
-                                       np.random.normal(0, .5, (self.num_particles, 1)),
+                                       np.hstack((np.random.normal(0, .1, (self.num_particles, 1)),
+                                       np.random.normal(0, .1, (self.num_particles, 1)),
                                        np.random.normal(0, .5, (self.num_particles, 1)))))
         
         self.compute_particle_avg()
