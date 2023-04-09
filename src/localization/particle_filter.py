@@ -25,9 +25,12 @@ class ParticleFilter:
 
 
         # init stuff
-        self.rate = 20
+        self.rate = 50
         self.particles = None
         rospy.Rate(self.rate)
+
+        self.prev_time = None
+        self.count = 0
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -131,9 +134,12 @@ class ParticleFilter:
         if self.particles is None:
             return
 
+        self.count += 1
+        if self.count % 10 != 0:
+            return
+
         probs = self.sensor_model.evaluate(self.particles, np.array(laser_msg.ranges))
         probs = probs / np.sum(probs)
-        # self.particles = (self.particles[np.random.choice(self.num_particles, size=self.num_particles, p=probs)])
         self.particles = (self.particles[np.random.choice(self.num_particles, size=self.num_particles, p=probs)] + 
                                        np.hstack((np.random.normal(0, .1, (self.num_particles, 1)),
                                        np.random.normal(0, .1, (self.num_particles, 1)),
@@ -153,8 +159,19 @@ class ParticleFilter:
         if self.particles is None:
             return
 
+
         # create the [dx, dy, dtheta] from the odom msg
-        odom_list = 1/self.rate * np.array([odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.angular.z])
+        # rospy.loginfo([odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.angular.z])
+
+        time_dif = 0
+        if self.prev_time is None:
+            time_dif = 1 / self.rate
+        else:
+            time_dif = odom_msg.header.stamp.to_time() - self.prev_time
+        self.prev_time = odom_msg.header.stamp.to_time()
+
+        odom_list = time_dif * np.array([odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.angular.z])
+        # rospy.loginfo(odom_list)
 
         self.particles = self.motion_model.evaluate(self.particles, odom_list)
 
@@ -237,7 +254,7 @@ class ParticleFilter:
         map_to_base_link_trans = TransformStamped()
         map_to_base_link_trans.header.stamp = rospy.Time.now()
         map_to_base_link_trans.header.frame_id = "map"
-        map_to_base_link_trans.child_frame_id = "base_link_pf"
+        map_to_base_link_trans.child_frame_id = "base_link"
         t = map_to_base_link_trans.header.stamp.to_sec()
         map_to_base_link_trans.transform.translation.x = odom_msg.pose.pose.position.x
         map_to_base_link_trans.transform.translation.y = odom_msg.pose.pose.position.y
@@ -249,7 +266,7 @@ class ParticleFilter:
         self.tf_broadcaster.sendTransform(map_to_base_link_trans)
 
         # get the ground truth transformation
-        rospy.loginfo("trying to publish data")
+        # rospy.loginfo("trying to publish data")
         try:
             ground_truth_pose = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time())
             ground_truth_x = ground_truth_pose.transform.translation.x

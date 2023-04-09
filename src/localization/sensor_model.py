@@ -1,5 +1,5 @@
 import numpy as np
-from localization.scan_simulator_2d import PyScanSimulator2D
+from scan_simulator_2d import PyScanSimulator2D
 # Try to change to just `from scan_simulator_2d import PyScanSimulator2D` 
 # if any error re: scan_simulator_2d occurs
 
@@ -20,6 +20,7 @@ class SensorModel:
         self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
         self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale", 1.0)
+
 
         ####################################
         # TODO
@@ -132,8 +133,16 @@ class SensorModel:
         scans = self.scan_sim.scan(particles)
 
         # downsample data (do this first to prevent preprocessing data that will be removed!)
-        observation = observation[::len(observation)/self.num_beams_per_particle]
-        scans = scans[:,::scans.shape[1]/self.num_beams_per_particle]
+        step = float(len(observation))/self.num_beams_per_particle
+        ind = 0
+        new_obs = []
+	while(ind < len(observation)):
+	    new_obs.append(observation[int(np.rint(ind))])
+            ind += step
+        observation = np.array(new_obs)
+
+        #observation = observation[::len(observation)/self.num_beams_per_particle]
+        #scans = scans[:,::scans.shape[1]/self.num_beams_per_particle]
 
         # scale meters to pixels
         scans = scans / (self.lidar_scale_to_map_scale * self.map_resolution)
