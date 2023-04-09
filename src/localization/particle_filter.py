@@ -254,7 +254,7 @@ class ParticleFilter:
         map_to_base_link_trans = TransformStamped()
         map_to_base_link_trans.header.stamp = rospy.Time.now()
         map_to_base_link_trans.header.frame_id = "map"
-        map_to_base_link_trans.child_frame_id = "base_link"
+        map_to_base_link_trans.child_frame_id = self.particle_filter_frame
         t = map_to_base_link_trans.header.stamp.to_sec()
         map_to_base_link_trans.transform.translation.x = odom_msg.pose.pose.position.x
         map_to_base_link_trans.transform.translation.y = odom_msg.pose.pose.position.y
@@ -265,7 +265,7 @@ class ParticleFilter:
         map_to_base_link_trans.transform.rotation.w = quaternion[3]
         self.tf_broadcaster.sendTransform(map_to_base_link_trans)
 
-        # get the ground truth transformation
+        # get the ground truth transformation (for sim)
         # rospy.loginfo("trying to publish data")
         try:
             ground_truth_pose = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time())
