@@ -265,19 +265,57 @@ class ParticleFilter:
         map_to_base_link_trans.transform.rotation.w = quaternion[3]
         self.tf_broadcaster.sendTransform(map_to_base_link_trans)
 
-        # get the ground truth transformation (for sim)
-        # rospy.loginfo("trying to publish data")
         try:
-            ground_truth_pose = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time())
-            ground_truth_x = ground_truth_pose.transform.translation.x
-            ground_truth_y = ground_truth_pose.transform.translation.y
+            # this code for getting ground truth to determine error (sim only)
+            # ground_truth_pose = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time())
+            # ground_truth_x = ground_truth_pose.transform.translation.x
+            # ground_truth_y = ground_truth_pose.transform.translation.y
+            
+            # this code for computing error along straight path (real world only)
+            # set these start and endpoint values using the sim
+            start_x = 9.147
+            start_y = 15.134
+
+            end_x = 6.107
+            end_y = 11.797
 
             euclidean_dist_error = np.sqrt((ground_truth_x-odom_msg.pose.pose.position.x) ** 2+(ground_truth_y-odom_msg.pose.pose.position.y) ** 2)
+            
             self.error_pub.publish(euclidean_dist_error)
 
         except Exception,e:
             rospy.loginfo(str(e))
             pass
+
+        
+    def line_segment_dist(self, p_x, p_y, start_point_x, start_point_y, end_point_x, end_point_y):
+        ''' Computes the distance between a point (x, y) and a line segment defined by the endpoints
+            (start_point_x, start_point_y) and (end_point_x, end_point_y).
+        '''
+        a = p_x - start_point_x
+        b = p_y - start_point_y
+        c = end_point_x - start_point_x
+        d = end_point_y - start_point_y
+
+        dot = a * c + b * d
+        len_sq = c * c + d * d
+        param = -1
+        if len_sq != 0:
+            param = dot / len_sq
+
+        if param  < 0:
+            xx = start_point_x
+            yy = start_point_y
+        elif param > 1:
+            xx = end_point_x
+            yy = end_point_y
+        else:
+            xx = start_point_x + param * c
+            yy = start_point_y + param * d
+    
+        dx = p_x - xx
+        dy = p_y - yy
+        return np.sqrt(dx * dx + dy * dy)
     
     
 if __name__ == "__main__":
