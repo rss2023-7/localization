@@ -17,8 +17,6 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from std_msgs.msg import Float32
 
-import tf.transformations as trans
-
 class ParticleFilter:
 
     def __init__(self):
